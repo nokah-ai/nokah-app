@@ -1,0 +1,30 @@
+{
+  "R007": {
+    "enabled": true,
+    "min_height": 0.90,
+    "priority": "Critical"
+  },
+  "I006": {
+    "enabled": true,
+    "min_height": 1.00,
+    "priority": "Major"
+  },
+  "R008": {
+    "enabled": true,
+    "min_z": 0.40,
+    "priority": "Major"
+  },
+  "R012": {
+    "enabled": true,
+    "min_width": 0.80,
+    "priority": "Major"
+  },
+  "R006": {
+    "enabled": true,
+    "priority": "Critical"
+  },
+  "R011": {
+    "enabled": true,
+    "priority": "Minor"
+  }
+}

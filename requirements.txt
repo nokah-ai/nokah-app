@@ -1,0 +1,7 @@
+streamlit>=1.28.0
+ifcopenshell
+pandas
+numpy
+scikit-learn
+plotly
+openpyxl

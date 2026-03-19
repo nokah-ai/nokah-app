@@ -1,0 +1,10 @@
+file,file_hash,model_scope,is_benchmark_eligible,discipline_primary,score_global,score_metier,score_data,walls,doors,windows,slabs,railings,total_objects,errors_critical,errors_major,errors_minor,errors_total,date
+projet.ifc,e69d56b9fe92df7f2f3e2afda0a3d8526f6a9003e6f1a67e5ca7b33f348b5c03,BuildingModel,True,Architecture,64.81,53.53,91.14,329,153,77,46,21,1505,8,46,242,296,2026-03-16T07:07:37.132779
+BRICE MIAMBANZILA ProjetX3.ifc,57e296fb472d77ddac490e5f7fbd8e1be3a51d4dcd4672e9b34e18005338b42e,BuildingModel,True,Architecture,45.26,33.8,72.0,914,0,95,30,22,3345,0,223,2895,3118,2026-03-16T07:09:26.030212
+CVC.ifc,18838501d52cddf32f1c70a9d4f3031e4e7c20986fee89fcb99f2ddc79a144f2,DisciplineSubmodel,True,MEP,98.89,98.41,100.0,0,0,0,0,0,4561,0,262,97,359,2026-03-16T07:11:45.301064
+STR.ifc,0ca0c4b6e09d1a6a7f7a2c674763eb785a484986b4eaea0c4a569b882c34dff1,BuildingModel,True,Structure,88.08,95.57,70.6,183,15,0,42,0,1511,0,33,448,481,2026-03-16T07:12:33.932558
+BIM4EEB_DEMONSTRATION_BLDG_FIN.ifc,dc58869b12b33b322dbd14a22559aa6b54614baa516288a4c10e60f50bfbc6ab,BuildingModel,True,Architecture,97.6,100.0,92.0,242,0,335,0,0,1396,0,0,0,0,2026-03-16T07:14:00.044386
+BIM4EEB_DEMONSTRATION_BLDG_ITA.ifc,3724efd564e378acebabbbaad57f171f52acc2a3f6d4e59e15332dcae8f99fc1,BuildingModel,True,Architecture,97.6,100.0,92.0,1384,161,439,135,0,5479,0,0,0,0,2026-03-16T07:14:46.018622
+BIM4EEB_DEMONSTRATION_BLDG_POL.ifc,e3e452604ce83836e395c57fe0f6eb2b2340e97d46a5e5057d27c612b0aa57f3,BuildingModel,True,Architecture,91.45,91.22,92.0,127,3,82,11,0,490,0,12,0,12,2026-03-16T07:15:23.805121
+DS3_TalTech_V4.ifc,05919eee0701b955d3d08501c4889c879d9c486e2389a6a1a5cdaad32a5d10ba,BuildingModel,True,MEP,13.19,0.0,43.97,399,119,122,64,2,3280,1,1031,773,1805,2026-03-16T07:17:07.541592
+column-straight-rectangle-tessellation.ifc,58bb9b2cae96edf2c368de95f526650f3f282e4e7fc37c0065c501bdbeed00a1,ObjectOnly,False,Unknown,24.0,0.0,80.0,0,0,0,0,0,2,0,2,2,4,2026-03-16T07:31:00.157288
