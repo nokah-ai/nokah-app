@@ -396,7 +396,7 @@ def call_groq(question: str, analysis: dict, history: list, lang: str) -> str | 
                 "Content-Type": "application/json"
             },
             json={
-                "model": "llama-3.1-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": messages,
                 "temperature": 0.7,
                 "max_tokens": 600,
@@ -408,7 +408,8 @@ def call_groq(question: str, analysis: dict, history: list, lang: str) -> str | 
             return response.json()["choices"][0]["message"]["content"].strip()
         return None
 
-    except Exception:
+    except Exception as _e:
+        # Return None silently — local fallback will handle it
         return None
 
 

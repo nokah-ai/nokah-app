@@ -1607,15 +1607,27 @@ div[data-testid="stBottom"] {
 }
 </style>''', unsafe_allow_html=True)
 
-# Plus button — inside sticky area, left-aligned
-_col_plus, _col_sp = st.columns([1, 11])
-with _col_plus:
-    if st.button("＋", key="nk_plus",
-                 help=_t("Upload a new IFC", "Analyser un nouveau IFC")):
-        st.session_state.nk_done = False
-        st.session_state.nk_file = None
-        st.session_state.nk_chat_history = []
-        st.rerun()
+# Plus button — fixed bottom left, inside chat bar via CSS
+st.markdown('''<style>
+.nk-plus-fixed { position:fixed; bottom:14px; left:calc(50% - 295px); z-index:10000; }
+.nk-plus-fixed button {
+    background:#1E293B !important; border:1.5px solid #378ADD !important;
+    border-radius:50% !important; width:34px !important; height:34px !important;
+    color:#378ADD !important; font-size:20px !important; font-weight:300 !important;
+    padding:0 !important; cursor:pointer !important; line-height:1 !important;
+    min-height:0 !important;
+}
+.nk-plus-fixed button:hover { background:#378ADD !important; color:white !important; }
+div[data-testid="stChatInput"] textarea { padding-left: 8px !important; }
+</style>''', unsafe_allow_html=True)
+st.markdown('<div class="nk-plus-fixed">', unsafe_allow_html=True)
+if st.button("＋", key="nk_plus",
+             help=_t("Upload a new IFC", "Analyser un nouveau IFC")):
+    st.session_state.nk_done = False
+    st.session_state.nk_file = None
+    st.session_state.nk_chat_history = []
+    st.rerun()
+st.markdown('</div>', unsafe_allow_html=True)
 
 # Native st.chat_input — sticky at bottom automatically
 _q = st.chat_input(
