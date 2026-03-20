@@ -1533,13 +1533,20 @@ def _call_groq_direct(question, analysis, history, lang):
         return None
     try:
         fr = lang == "FR"
-        system = f"""You are nokah, an AI specialized in BIM quality analysis only.
-Model: {analysis.get('filename','unknown')} | Discipline: {analysis.get('discipline','unknown')}
-Score: {analysis.get('score_global',0):.1f}/100 | Technical: {analysis.get('score_metier',0):.1f}/100 | BIM data: {analysis.get('score_data_bim',0):.1f}/100
-Critical: {analysis.get('n_critical',0)} | Major: {analysis.get('n_major',0)} | Minor: {analysis.get('n_minor',0)}
-Top issues: {", ".join(analysis.get('top_issues',[])[:5])}
-Benchmark: {analysis.get('benchmark_position','N/A')}
-RULES: Only answer BIM/construction/IFC questions. Redirect off-topic questions. Never invent data. Respond in {"French" if fr else "English"}. Be concise and precise."""
+        obj = analysis.get('objects', {})
+        obj_str = f"Walls:{obj.get('walls',0)} Doors:{obj.get('doors',0)} Windows:{obj.get('windows',0)} Slabs:{obj.get('slabs',0)} Railings:{obj.get('railings',0)} MEP:{obj.get('mep',0)} Total:{obj.get('total',0)}"
+        system = (
+            f"You are nokah, an AI specialized in BIM quality analysis only.\n"
+            f"Model: {analysis.get('filename','unknown')} | Discipline: {analysis.get('discipline','unknown')}\n"
+            f"Score: {analysis.get('score_global',0):.1f}/100 | Technical: {analysis.get('score_metier',0):.1f}/100 | BIM data: {analysis.get('score_data_bim',0):.1f}/100\n"
+            f"Critical: {analysis.get('n_critical',0)} | Major: {analysis.get('n_major',0)} | Minor: {analysis.get('n_minor',0)}\n"
+            f"Object counts: {obj_str}\n"
+            f"Top issues: {', '.join(analysis.get('top_issues',[])[:5])}\n"
+            f"Benchmark: {analysis.get('benchmark_position','N/A')}\n"
+            f"RULES: Only answer BIM/construction/IFC/architecture/engineering questions. "
+            f"If completely off-topic (weather, politics, sport, cooking), say you only cover BIM topics. "
+            f"Never invent data. Respond in {'French' if fr else 'English'}. Be concise and precise."
+        )
         msgs = [{"role":"system","content":system}]
         for m in history[-6:]:
             msgs.append({"role":m["role"],"content":m["content"]})
