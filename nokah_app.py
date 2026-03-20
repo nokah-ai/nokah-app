@@ -1566,14 +1566,61 @@ for _msg in st.session_state.nk_chat_history:
             '</div></div></div>', unsafe_allow_html=True)
 
 # ── CHAT SECTION ─────────────────────────────────────────────────────────────
+import os as _os
+try:
+    from nokah_chat import get_chat_response
+    _chat_ok = True
+except ImportError:
+    _chat_ok = False
+
+# Inject Groq key into os.environ so nokah_chat.py can access it
+try:
+    _gk = st.secrets.get("GROQ_API_KEY", "")
+    if _gk: _os.environ["GROQ_API_KEY"] = _gk
+except Exception:
+    pass
+
+# Build real context from bim_json
+_errors_ctx = bim_json.get("errors", {})
+_top_issues_ctx = []
+_bj_top = bim_json.get("top_issues", [])
+for _r in _bj_top[:5]:
+    if isinstance(_r, dict):
+        _m = _r.get("message","") or _r.get("Message","") or str(_r)
+        if _m: _top_issues_ctx.append(str(_m)[:100])
+    elif isinstance(_r, str):
+        _top_issues_ctx.append(_r[:100])
+
+_bench_ctx = benchmark.get("position","") if benchmark else ""
+_atypie_ctx = ""
+if ai_result and ai_result.get("available"):
+    _lmap = {"Normal":"Normal","Atypique":"Atypical","Très atypique":"Very atypical"}
+    _atypie_ctx = _lmap.get(ai_result.get("label",""),"")
+
+_chat_ctx = {
+    "filename": uploaded.name,
+    "discipline": _disc_en(primary),
+    "score_global": round(score_global, 1),
+    "score_metier": round(score_metier, 1),
+    "score_data_bim": round(score_data, 1),
+    "n_critical": _errors_ctx.get("critical", 0),
+    "n_major": _errors_ctx.get("major", 0),
+    "n_minor": _errors_ctx.get("minor", 0),
+    "top_issues": _top_issues_ctx,
+    "benchmark_position": _bench_ctx,
+    "atypie_label": _atypie_ctx,
+    "objects": bim_json.get("objects", {}),
+}
+
+# Chat CSS
 st.markdown("""<style>
 div[data-testid="stChatInputSubmitButton"] button {
-    background: #378ADD !important; border-radius: 50% !important;
-    border: none !important; width: 34px !important; height: 34px !important;
+    background:#378ADD !important; border-radius:50% !important;
+    border:none !important; width:34px !important; height:34px !important;
 }
 div[data-testid="stChatInputSubmitButton"] button svg { display:none !important; }
 div[data-testid="stChatInputSubmitButton"] button::after {
-    content: "\u2191"; color: white; font-size: 18px; font-weight: bold;
+    content:"\2191"; color:white; font-size:18px; font-weight:bold;
 }
 div[data-testid="stChatInput"] { max-width:640px !important; margin:0 auto !important; }
 div[data-testid="stChatInput"] > div {
@@ -1581,28 +1628,56 @@ div[data-testid="stChatInput"] > div {
     border-radius:24px !important; background:#1E293B !important;
 }
 section[data-testid="stMain"] .block-container { padding-bottom:90px !important; }
-/* Disclaimer below sticky bar */
 div[data-testid="stBottom"]::after {
-    content: "nokah est une IA et peut faire des erreurs. Veuillez vérifier les réponses.";
-    display: block; text-align: center;
-    font-size: 11px; color: #475569;
-    padding: 2px 0 3px 0;
-    background: inherit;
+    content:"nokah est une IA et peut faire des erreurs. Veuillez vérifier les réponses.";
+    display:block; text-align:center; font-size:11px;
+    color:#475569; padding:2px 0 3px 0;
 }
 </style>""", unsafe_allow_html=True)
 
-# (disclaimer shown below chat bar via CSS)
+# Welcome bubble
+st.markdown(
+    '<div class="chat-wrap" style="padding-top:0;padding-bottom:0">'
+    '<div class="chat-row chat-row-left"><div style="max-width:85%">'
+    '<div class="bubble-nokah">'
+    '<div class="bk-label">nokah — ' + _t("Ask anything about your model","Posez vos questions sur votre maquette") + '</div>'
+    '<div style="font-size:13px;color:#94A3B8">' +
+    _t("Issues · Score · What to fix · Norms · Compare","Anomalies · Score · Corrections · Normes · Comparer") +
+    '</div></div></div></div></div>',
+    unsafe_allow_html=True
+)
+
+# Chat history
+for _msg in st.session_state.nk_chat_history:
+    if _msg["role"] == "user":
+        st.markdown(
+            '<div class="chat-wrap" style="padding-top:0;padding-bottom:4px">'
+            '<div class="chat-row chat-row-right">'
+            '<div class="bubble-client" style="max-width:70%">'
+            f'<p style="margin:0;font-size:14px">{_msg["content"]}</p>'
+            '</div></div></div>', unsafe_allow_html=True)
+    else:
+        import re as _re
+        _fmt = _re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', _msg["content"])
+        _fmt = _fmt.replace('\n', '<br>')
+        _badge = '<span style="font-size:10px;color:#22D3EE;float:right">⚡ AI</span>' if _msg.get("source") == "groq" else ""
+        st.markdown(
+            '<div class="chat-wrap" style="padding-top:0;padding-bottom:4px">'
+            '<div class="chat-row chat-row-left">'
+            '<div class="bubble-nokah" style="max-width:85%">'
+            + _badge + f'<p style="margin:0;font-size:14px;line-height:1.7">{_fmt}</p>'
+            + '</div></div></div>', unsafe_allow_html=True)
 
 # Plus button
-_, _plus_col = st.columns([12, 1])
-with _plus_col:
-    if st.button("＋", key="nk_plus", help=_t("Upload a new IFC", "Analyser un nouveau IFC")):
+_, _pc = st.columns([12, 1])
+with _pc:
+    if st.button("＋", key="nk_plus", help=_t("Upload a new IFC","Analyser un nouveau IFC")):
         st.session_state.nk_done = False
         st.session_state.nk_file = None
         st.session_state.nk_chat_history = []
         st.rerun()
 
-# Native sticky chat input
+# Sticky chat input
 _q = st.chat_input(
     _t("Ask about issues, score, corrections, norms...",
        "Anomalies, score, corrections, normes..."),
@@ -1613,9 +1688,9 @@ if _q and _q.strip() and _chat_ok:
     with st.spinner(_t("nokah is thinking...", "nokah réfléchit...")):
         _resp, _src = get_chat_response(_q, _chat_ctx,
             st.session_state.nk_chat_history,
-            st.session_state.get("nk_lang", "EN"))
-    st.session_state.nk_chat_history.append({"role": "user", "content": _q})
-    st.session_state.nk_chat_history.append({"role": "assistant", "content": _resp, "source": _src})
+            st.session_state.get("nk_lang","EN"))
+    st.session_state.nk_chat_history.append({"role":"user","content":_q})
+    st.session_state.nk_chat_history.append({"role":"assistant","content":_resp,"source":_src})
     st.rerun()
 elif _q and _q.strip() and not _chat_ok:
     st.error("nokah_chat.py not found.")
