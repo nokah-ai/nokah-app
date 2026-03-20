@@ -1575,10 +1575,14 @@ except ImportError:
 
 # Inject Groq key into os.environ so nokah_chat.py can access it
 try:
-    _gk = st.secrets.get("GROQ_API_KEY", "")
+    _gk = st.secrets["GROQ_API_KEY"]
     if _gk: _os.environ["GROQ_API_KEY"] = _gk
 except Exception:
-    pass
+    try:
+        _gk = st.secrets.get("GROQ_API_KEY", "")
+        if _gk: _os.environ["GROQ_API_KEY"] = _gk
+    except Exception:
+        pass
 
 # Build real context from bim_json
 _errors_ctx = bim_json.get("errors", {})
