@@ -1484,11 +1484,19 @@ with st.expander(_t("Expert mode — full results, JSON export, dataset stats",
 st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
 
 # ── CHAT BAR ──────────────────────────────────────────────────────────────────
+import os as _os
 try:
     from nokah_chat import get_chat_response
     _chat_ok = True
 except ImportError:
     _chat_ok = False
+
+# Pass Groq key via env so nokah_chat.py can access it
+try:
+    _gk = st.secrets.get("GROQ_API_KEY", "")
+    if _gk: _os.environ["GROQ_API_KEY"] = _gk
+except Exception:
+    pass
 
 # Build real context from bim_json
 _errors_ctx = bim_json.get("errors", {})
@@ -1536,41 +1544,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Suggestion chips — shown only before first message
-if not st.session_state.nk_chat_history:
-    _chips = (
-        ["Quelles sont les anomalies ?", "Pourquoi ce score ?", "Que corriger en priorité ?", "Comparer aux autres maquettes"]
-        if st.session_state.get("nk_lang") == "FR"
-        else ["What are the issues?", "Why is the score low?", "What to fix first?", "Compare to other models"]
-    )
-    _chip_css = (
-        "<style>"
-        ".nk-chip-row{display:flex;flex-wrap:wrap;gap:8px;max-width:640px;margin:0 auto 12px auto;padding:0 1rem}"
-        "</style>"
-        '<div class="nk-chip-row">'
-        + "".join([
-            f'<span style="font-size:12px;color:#93C5FD;background:#0F172A;border:1px solid #1E3A8A;'
-            f'border-radius:999px;padding:6px 14px;cursor:default;white-space:nowrap">{c}</span>'
-            for c in _chips
-        ])
-        + "</div>"
-    )
-    st.markdown(_chip_css, unsafe_allow_html=True)
-    _chip_cols = st.columns(len(_chips))
-    for _ci2, _chip2 in enumerate(_chips):
-        with _chip_cols[_ci2]:
-            if st.button(_chip2, key=f"nk_chip_{_ci2}", use_container_width=True):
-                try:
-                    _gkey = st.secrets.get("GROQ_API_KEY", "")
-                except Exception:
-                    _gkey = ""
-                if _chat_ok:
-                    with st.spinner(_t("nokah is thinking...", "nokah réfléchit...")):
-                        _r2, _s2 = get_chat_response(_chip2, _chat_ctx,
-                            [], st.session_state.get("nk_lang","EN"), groq_key=_gkey)
-                    st.session_state.nk_chat_history.append({"role":"user","content":_chip2})
-                    st.session_state.nk_chat_history.append({"role":"assistant","content":_r2,"source":_s2})
-                    st.rerun()
 
 for _msg in st.session_state.nk_chat_history:
     if _msg["role"] == "user":
@@ -1591,6 +1564,26 @@ for _msg in st.session_state.nk_chat_history:
             '<div class="bubble-nokah" style="max-width:85%">' +
             _badge + f'<p style="margin:0;font-size:14px;line-height:1.7">{_fmt}</p>' +
             '</div></div></div>', unsafe_allow_html=True)
+
+# ── Suggestion chips — shown below history, above input ──────────────────────
+if not st.session_state.nk_chat_history:
+    _chips = (
+        ["Quelles sont les anomalies ?", "Pourquoi ce score ?", "Que corriger en priorité ?", "Comparer aux autres maquettes"]
+        if st.session_state.get("nk_lang") == "FR"
+        else ["What are the issues?", "Why is the score low?", "What to fix first?", "Compare to other models"]
+    )
+    _cc = st.columns(len(_chips))
+    for _ci2, _chip2 in enumerate(_chips):
+        with _cc[_ci2]:
+            if st.button(_chip2, key=f"nk_chip_{_ci2}", use_container_width=True):
+                if _chat_ok:
+                    with st.spinner(_t("nokah is thinking...", "nokah réfléchit...")):
+                        _r2, _s2 = get_chat_response(
+                            _chip2, _chat_ctx, [],
+                            st.session_state.get("nk_lang", "EN"))
+                    st.session_state.nk_chat_history.append({"role": "user", "content": _chip2})
+                    st.session_state.nk_chat_history.append({"role": "assistant", "content": _r2, "source": _s2})
+                    st.rerun()
 
 # ── Chat input — st.chat_input (native sticky bar) ───────────────────────────
 # Disclaimer above chat input
@@ -1655,8 +1648,36 @@ st.markdown('''<style>
 }
 .nk-plus-fixed button:hover { background:#378ADD !important; color:white !important; }
 div[data-testid="stChatInput"] textarea { padding-left: 8px !important; }
+/* Remove empty space under chat bar */
+section[data-testid="stMain"] .block-container { padding-bottom: 80px !important; }
+.stChatInput { margin-bottom: 0 !important; }
 </style>''', unsafe_allow_html=True)
-st.markdown('<div class="nk-plus-fixed">', unsafe_allow_html=True)
+
+# Plus button — fixed bottom left aligned with chat bar
+st.markdown('''<style>
+.nk-plus-wrap {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-340px);
+    z-index: 10000;
+}
+.nk-plus-wrap button {
+    background: #1E293B !important;
+    border: 1.5px solid #378ADD !important;
+    border-radius: 50% !important;
+    width: 36px !important;
+    height: 36px !important;
+    color: #378ADD !important;
+    font-size: 22px !important;
+    font-weight: 300 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    line-height: 1 !important;
+}
+.nk-plus-wrap button:hover { background: #378ADD !important; color: white !important; }
+</style>''', unsafe_allow_html=True)
+st.markdown('<div class="nk-plus-wrap">', unsafe_allow_html=True)
 if st.button("＋", key="nk_plus",
              help=_t("Upload a new IFC", "Analyser un nouveau IFC")):
     st.session_state.nk_done = False
@@ -1664,6 +1685,26 @@ if st.button("＋", key="nk_plus",
     st.session_state.nk_chat_history = []
     st.rerun()
 st.markdown('</div>', unsafe_allow_html=True)
+
+# Suggestion chips — shown below history, above input bar
+if not st.session_state.nk_chat_history:
+    _chips = (
+        ["Quelles sont les anomalies ?", "Pourquoi ce score ?", "Que corriger en priorité ?", "Comparer aux autres maquettes"]
+        if st.session_state.get("nk_lang") == "FR"
+        else ["What are the issues?", "Why is the score low?", "What to fix first?", "Compare to other models"]
+    )
+    _cc = st.columns(len(_chips))
+    for _ci2, _chip2 in enumerate(_chips):
+        with _cc[_ci2]:
+            if st.button(_chip2, key=f"nk_chip_{_ci2}", use_container_width=True):
+                if _chat_ok:
+                    with st.spinner(_t("nokah is thinking...", "nokah réfléchit...")):
+                        _r2, _s2 = get_chat_response(
+                            _chip2, _chat_ctx, [],
+                            st.session_state.get("nk_lang", "EN"))
+                    st.session_state.nk_chat_history.append({"role": "user", "content": _chip2})
+                    st.session_state.nk_chat_history.append({"role": "assistant", "content": _r2, "source": _s2})
+                    st.rerun()
 
 # Native st.chat_input — sticky at bottom automatically
 _q = st.chat_input(
@@ -1673,15 +1714,11 @@ _q = st.chat_input(
 )
 
 if _q and _q.strip() and _chat_ok:
-    try:
-        _groq_key = st.secrets.get("GROQ_API_KEY", "")
-    except Exception:
-        _groq_key = ""
     with st.spinner(_t("nokah is thinking...", "nokah réfléchit...")):
         _resp, _src = get_chat_response(_q, _chat_ctx,
             st.session_state.nk_chat_history,
             st.session_state.get("nk_lang", "EN"),
-            groq_key=_groq_key)
+)
     st.session_state.nk_chat_history.append({"role": "user", "content": _q})
     st.session_state.nk_chat_history.append({"role": "assistant", "content": _resp, "source": _src})
     st.rerun()
