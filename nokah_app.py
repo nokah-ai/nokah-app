@@ -1653,60 +1653,85 @@ section[data-testid="stMain"] .block-container { padding-bottom: 80px !important
 .stChatInput { margin-bottom: 0 !important; }
 </style>''', unsafe_allow_html=True)
 
-# Plus button — fixed bottom left aligned with chat bar
+# ── CHAT SECTION ─────────────────────────────────────────────────────────────
+# CSS: sticky bar styling + remove empty space + send button arrow
 st.markdown('''<style>
-.nk-plus-wrap {
-    position: fixed;
-    bottom: 16px;
-    left: 50%;
-    transform: translateX(-340px);
-    z-index: 10000;
-}
-.nk-plus-wrap button {
-    background: #1E293B !important;
-    border: 1.5px solid #378ADD !important;
+/* Send button → blue circle with up arrow */
+div[data-testid="stChatInputSubmitButton"] button {
+    background: #378ADD !important;
     border-radius: 50% !important;
-    width: 36px !important;
-    height: 36px !important;
-    color: #378ADD !important;
-    font-size: 22px !important;
-    font-weight: 300 !important;
-    padding: 0 !important;
-    min-height: 0 !important;
-    line-height: 1 !important;
+    border: none !important;
+    width: 34px !important; height: 34px !important;
 }
-.nk-plus-wrap button:hover { background: #378ADD !important; color: white !important; }
+div[data-testid="stChatInputSubmitButton"] button svg { display:none !important; }
+div[data-testid="stChatInputSubmitButton"] button::after {
+    content: "↑"; color: white; font-size: 18px; font-weight: bold;
+}
+/* Center and size the chat bar */
+div[data-testid="stChatInput"] { max-width:640px !important; margin:0 auto !important; }
+div[data-testid="stChatInput"] > div {
+    border:1.5px solid #378ADD !important;
+    border-radius:24px !important;
+    background:#1E293B !important;
+}
+/* Remove extra padding at bottom */
+section[data-testid="stMain"] .block-container { padding-bottom:90px !important; }
 </style>''', unsafe_allow_html=True)
-st.markdown('<div class="nk-plus-wrap">', unsafe_allow_html=True)
-if st.button("＋", key="nk_plus",
-             help=_t("Upload a new IFC", "Analyser un nouveau IFC")):
-    st.session_state.nk_done = False
-    st.session_state.nk_file = None
-    st.session_state.nk_chat_history = []
-    st.rerun()
-st.markdown('</div>', unsafe_allow_html=True)
 
-# Suggestion chips — shown below history, above input bar
+# Disclaimer
+st.markdown(
+    '<div style="text-align:center;font-size:11px;color:#475569;margin-bottom:6px">' +
+    _t("nokah is an AI and may make mistakes. Please verify responses.",
+       "nokah est une IA et peut faire des erreurs. Veuillez vérifier les réponses.") +
+    '</div>',
+    unsafe_allow_html=True
+)
+
+# Suggestion chips — only shown before first message, 2 per row
 if not st.session_state.nk_chat_history:
-    _chips = (
-        ["Quelles sont les anomalies ?", "Pourquoi ce score ?", "Que corriger en priorité ?", "Comparer aux autres maquettes"]
-        if st.session_state.get("nk_lang") == "FR"
-        else ["What are the issues?", "Why is the score low?", "What to fix first?", "Compare to other models"]
-    )
-    _cc = st.columns(len(_chips))
-    for _ci2, _chip2 in enumerate(_chips):
-        with _cc[_ci2]:
-            if st.button(_chip2, key=f"nk_chip_{_ci2}", use_container_width=True):
-                if _chat_ok:
-                    with st.spinner(_t("nokah is thinking...", "nokah réfléchit...")):
-                        _r2, _s2 = get_chat_response(
-                            _chip2, _chat_ctx, [],
-                            st.session_state.get("nk_lang", "EN"))
-                    st.session_state.nk_chat_history.append({"role": "user", "content": _chip2})
-                    st.session_state.nk_chat_history.append({"role": "assistant", "content": _r2, "source": _s2})
-                    st.rerun()
+    _chips_en = ["What are the issues?", "Why is the score low?", "What to fix first?", "Compare to other models"]
+    _chips_fr = ["Quelles sont les anomalies ?", "Pourquoi ce score ?", "Que corriger en priorité ?", "Comparer aux autres"]
+    _chips = _chips_fr if st.session_state.get("nk_lang") == "FR" else _chips_en
+    _, _chip_center, _ = st.columns([1, 4, 1])
+    with _chip_center:
+        st.markdown(
+            '<style>.nk-chip-wrap{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:8px}</style>' +
+            '<div class="nk-chip-wrap">' +
+            "".join([f'<span style="font-size:12px;color:#93C5FD;background:#0F172A;border:1px solid #1E3A8A;border-radius:999px;padding:5px 14px">{c}</span>' for c in _chips]) +
+            '</div>',
+            unsafe_allow_html=True
+        )
+        _cr1, _cr2 = st.columns(2)
+        for _ci3, (_chip3, _col3) in enumerate(zip(_chips[:2], [_cr1, _cr2])):
+            with _col3:
+                if st.button(_chip3, key=f"chip_a_{_ci3}", use_container_width=True):
+                    if _chat_ok:
+                        with st.spinner(_t("nokah is thinking...", "nokah réfléchit...")):
+                            _r3, _s3 = get_chat_response(_chip3, _chat_ctx, [], st.session_state.get("nk_lang","EN"))
+                        st.session_state.nk_chat_history.append({"role":"user","content":_chip3})
+                        st.session_state.nk_chat_history.append({"role":"assistant","content":_r3,"source":_s3})
+                        st.rerun()
+        _cr3, _cr4 = st.columns(2)
+        for _ci4, (_chip4, _col4) in enumerate(zip(_chips[2:], [_cr3, _cr4])):
+            with _col4:
+                if st.button(_chip4, key=f"chip_b_{_ci4}", use_container_width=True):
+                    if _chat_ok:
+                        with st.spinner(_t("nokah is thinking...", "nokah réfléchit...")):
+                            _r4, _s4 = get_chat_response(_chip4, _chat_ctx, [], st.session_state.get("nk_lang","EN"))
+                        st.session_state.nk_chat_history.append({"role":"user","content":_chip4})
+                        st.session_state.nk_chat_history.append({"role":"assistant","content":_r4,"source":_s4})
+                        st.rerun()
 
-# Native st.chat_input — sticky at bottom automatically
+# Plus button — new IFC (small, right-aligned, above chat bar)
+_, _plus_col = st.columns([10, 1])
+with _plus_col:
+    if st.button("＋", key="nk_plus", help=_t("Upload a new IFC","Analyser un nouveau IFC")):
+        st.session_state.nk_done = False
+        st.session_state.nk_file = None
+        st.session_state.nk_chat_history = []
+        st.rerun()
+
+# Native sticky chat input
 _q = st.chat_input(
     _t("Ask about issues, score, corrections, norms...",
        "Anomalies, score, corrections, normes..."),
@@ -1717,12 +1742,9 @@ if _q and _q.strip() and _chat_ok:
     with st.spinner(_t("nokah is thinking...", "nokah réfléchit...")):
         _resp, _src = get_chat_response(_q, _chat_ctx,
             st.session_state.nk_chat_history,
-            st.session_state.get("nk_lang", "EN"),
-)
+            st.session_state.get("nk_lang", "EN"))
     st.session_state.nk_chat_history.append({"role": "user", "content": _q})
     st.session_state.nk_chat_history.append({"role": "assistant", "content": _resp, "source": _src})
     st.rerun()
 elif _q and _q.strip() and not _chat_ok:
     st.error("nokah_chat.py not found.")
-
-st.markdown("<div style='height:3rem'></div>", unsafe_allow_html=True)
