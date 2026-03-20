@@ -1405,6 +1405,9 @@ st.markdown(
 
 st.markdown('''<style>
 /* Expert mode expander — constrain to chat width, left-aligned */
+/* Hide JSON export subheader and download button in expert mode */
+[data-testid="stExpander"] [data-testid="stSubheader"] ~ [data-testid="stDownloadButton"],
+[data-testid="stExpander"] [data-testid="stDownloadButton"] { display: none !important; }
 [data-testid="stExpander"] {
     max-width: 650px !important;
     margin-left: calc((100% - 760px) / 2) !important;
@@ -1503,35 +1506,39 @@ st.markdown("<div style='height:3rem'></div>", unsafe_allow_html=True)
 
 # ── Build analysis context for chat ──────────────────────────────────────────
 _top_issues = []
-if 'results' in dir() and results:
-    for r in results[:5]:
-        if hasattr(r, 'message'):
-            _top_issues.append(r.message)
-        elif isinstance(r, dict):
-            _top_issues.append(r.get('message', str(r))[:80])
+if 'bim_json' in dir() and bim_json:
+    _all_issues = bim_json.get("issues", []) or bim_json.get("results", [])
+    for _iss in _all_issues[:5]:
+        if isinstance(_iss, dict):
+            _msg = _iss.get("message","") or _iss.get("Message","") or _iss.get("title","")
+            if _msg: _top_issues.append(str(_msg)[:100])
+if not _top_issues and 'df_results' in dir() and df_results is not None and len(df_results) > 0:
+    for _, _row in df_results.head(5).iterrows():
+        _msg = _row.get("Message","") or _row.get("message","")
+        if _msg: _top_issues.append(str(_msg)[:100])
 
 _bench_pos = ""
-if 'bench_result' in dir() and bench_result:
-    _bench_pos = bench_result.get("position_label", "")
-elif 'benchmark_result' in dir() and benchmark_result:
-    _bench_pos = benchmark_result.get("position_label", "")
+if 'benchmark' in dir() and benchmark:
+    _bench_pos = benchmark.get("position", "")
 
 _atypie_lbl = ""
 if 'ai_result' in dir() and ai_result and ai_result.get("available"):
-    _atypie_lbl = ai_result.get("label", "")
+    _lbl_map = {"Normal":"Normal","Atypique":"Atypical","Très atypique":"Very atypical"}
+    _atypie_lbl = _lbl_map.get(ai_result.get("label",""), ai_result.get("label",""))
 
 _chat_analysis = {
     "filename": uploaded.name if uploaded else "model",
-    "discipline": disc if 'disc' in dir() else "Unknown",
+    "discipline": _disc_en(primary) if 'primary' in dir() else "Unknown",
     "score_global": round(score_global, 1) if 'score_global' in dir() else 0,
     "score_metier": round(score_metier, 1) if 'score_metier' in dir() else 0,
-    "score_data_bim": round(score_data_bim, 1) if 'score_data_bim' in dir() else 0,
-    "n_critical": n_critical if 'n_critical' in dir() else 0,
-    "n_major": n_major if 'n_major' in dir() else 0,
-    "n_minor": n_minor if 'n_minor' in dir() else 0,
+    "score_data_bim": round(score_data, 1) if 'score_data' in dir() else 0,
+    "n_critical": bim_json.get("errors",{}).get("critical",0) if 'bim_json' in dir() else 0,
+    "n_major": bim_json.get("errors",{}).get("major",0) if 'bim_json' in dir() else 0,
+    "n_minor": bim_json.get("errors",{}).get("minor",0) if 'bim_json' in dir() else 0,
     "top_issues": _top_issues,
     "benchmark_position": _bench_pos,
     "atypie_label": _atypie_lbl,
+    "objects": bim_json.get("objects", {}) if 'bim_json' in dir() else {},
 }
 
 # ── Session state for chat history ───────────────────────────────────────────

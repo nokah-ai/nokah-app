@@ -52,7 +52,16 @@ INTENT_PATTERNS = {
         r"météo", r"weather", r"recette", r"recipe", r"sport", r"foot",
         r"politique", r"politic", r"actualit", r"news", r"film", r"musique",
         r"blague", r"joke", r"histoire", r"story(?!.*bim)", r"code.*python(?!.*bim)",
-        r"c['\s]est quoi ton nom", r"qui es.tu", r"tu es.*ia",
+    ],
+    "identity": [
+        r"qui es.tu", r"tu es.*ia", r"c['\s]est quoi ton nom", r"ton nom",
+        r"what.*your name", r"who are you", r"what are you", r"quel.*ia",
+        r"nom.*ia", r"ia.*nom",
+    ],
+    "element_count": [
+        r"combien.*(porte|fenêtre|mur|poteau|dalle|escalier|pièce|zone|espace)",
+        r"how many.*(door|window|wall|column|slab|stair|room|space|element)",
+        r"nombre.*(porte|fenêtre|mur)", r"count.*element",
     ],
 }
 
@@ -115,6 +124,36 @@ def generate_local_response(question: str, analysis: dict, lang: str = "EN") -> 
               "Ce n'est pas mon domaine. Je suis là pour vous aider à comprendre et améliorer votre maquette BIM. Que voulez-vous savoir à son sujet ?",
               fr),
         ])
+
+    # ── IDENTITÉ ─────────────────────────────────────────────────────────────
+    if intent == "identity":
+        return _pick([
+            _("I'm **nokah** — an AI assistant specialized in BIM quality analysis. "
+              "I analyze IFC models, detect anomalies, score quality, and help you understand your BIM.",
+              "Je suis **nokah** — un assistant IA spécialisé dans l'analyse qualité BIM. "
+              "J'analyse les maquettes IFC, détecte les anomalies, évalue la qualité et vous aide à comprendre votre BIM.",
+              fr),
+            _("I'm **nokah**, your BIM quality intelligence assistant. "
+              "Ask me about your model's results, scores, or BIM best practices.",
+              "Je suis **nokah**, votre assistant d'intelligence qualité BIM. "
+              "Posez-moi des questions sur les résultats de votre maquette, les scores ou les bonnes pratiques BIM.",
+              fr),
+        ])
+
+    # ── COMPTAGE ÉLÉMENTS ────────────────────────────────────────────────────
+    if intent == "element_count":
+        # Get counts from bim_json objects if available
+        objects = analysis.get("objects", {})
+        if objects:
+            counts = "\n".join([f"• {k.capitalize()}: {v}" for k, v in list(objects.items())[:8]])
+            return _(f"Here are the element counts for this model:\n{counts}",
+                     f"Voici les comptages d'éléments de cette maquette :\n{counts}", fr)
+        return _(
+            "Element counts are available in the Expert mode section of the analysis. "
+            "I can tell you about quality issues, scores, and recommendations based on those elements.",
+            "Les comptages d'éléments sont disponibles dans la section Expert mode de l'analyse. "
+            "Je peux vous informer sur les anomalies, scores et recommandations basés sur ces éléments.",
+            fr)
 
     # ── SALUTATION ────────────────────────────────────────────────────────────
     if intent == "greeting":
