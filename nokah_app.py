@@ -1563,58 +1563,52 @@ _disclaimer = _t(
     "nokah est une IA et peut faire des erreurs. Veuillez vérifier les réponses."
 )
 
-# CSS to style the native chat_input bar
-st.markdown(f'''<style>
-/* Override send button → upward arrow */
-div[data-testid="stChatInputSubmitButton"] button {{
+# ── Chat bar CSS ─────────────────────────────────────────────────────────────
+st.markdown('''<style>
+/* Send button → blue circle with ↑ */
+div[data-testid="stChatInputSubmitButton"] button {
     background: #378ADD !important;
     border-radius: 50% !important;
     border: none !important;
     width: 34px !important;
     height: 34px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-}}
-div[data-testid="stChatInputSubmitButton"] button::before {{
+}
+div[data-testid="stChatInputSubmitButton"] button::before {
     content: "↑" !important;
     color: white !important;
     font-size: 18px !important;
     font-weight: bold !important;
     display: block !important;
-}}
-div[data-testid="stChatInputSubmitButton"] button svg {{
-    display: none !important;
-}}
-/* Style the chat input container */
-div[data-testid="stChatInput"] {{
-    max-width: 640px !important;
-    margin: 0 auto !important;
-}}
-div[data-testid="stChatInput"] > div {{
+}
+div[data-testid="stChatInputSubmitButton"] button svg { display: none !important; }
+/* Style the chat input bar */
+div[data-testid="stChatInput"] { max-width: 580px !important; margin: 0 auto !important; }
+div[data-testid="stChatInput"] > div {
     border: 1.5px solid #378ADD !important;
     border-radius: 24px !important;
     background: #1E293B !important;
-}}
-/* Disclaimer */
-.nk-disclaimer {{
+    padding-left: 8px !important;
+}
+/* Move disclaimer BELOW the sticky chat bar */
+div[data-testid="stBottom"] > div::after {
+    content: "nokah est une IA et peut faire des erreurs. Veuillez vérifier les réponses.";
+    display: block;
     text-align: center;
     font-size: 11px;
     color: #334155;
-    margin-bottom: 4px;
-}}
-</style>
-<div class="nk-disclaimer">{_disclaimer}</div>''', unsafe_allow_html=True)
+    padding: 3px 0 2px 0;
+    background: #0F172A;
+}
+/* + button next to chat bar — position it inside the sticky bottom */
+div[data-testid="stBottom"] {
+    background: #0F172A !important;
+    padding-bottom: 4px !important;
+    border-top: 0.5px solid #1E3A8A !important;
+}
+</style>''', unsafe_allow_html=True)
 
-# Native st.chat_input — always sticky at bottom
-_q = st.chat_input(
-    _t("Ask about issues, score, corrections, norms...",
-       "Anomalies, score, corrections, normes..."),
-    key="nk_chat_input"
-)
-
-# Plus button to reload IFC — above the chat bar
-_col_sp, _col_plus = st.columns([8, 1])
+# Plus button — inside sticky area, left-aligned
+_col_plus, _col_sp = st.columns([1, 11])
 with _col_plus:
     if st.button("＋", key="nk_plus",
                  help=_t("Upload a new IFC", "Analyser un nouveau IFC")):
@@ -1622,6 +1616,13 @@ with _col_plus:
         st.session_state.nk_file = None
         st.session_state.nk_chat_history = []
         st.rerun()
+
+# Native st.chat_input — sticky at bottom automatically
+_q = st.chat_input(
+    _t("Ask about issues, score, corrections, norms...",
+       "Anomalies, score, corrections, normes..."),
+    key="nk_chat_input"
+)
 
 if _q and _q.strip() and _chat_ok:
     with st.spinner(_t("nokah is thinking...", "nokah réfléchit...")):
