@@ -1502,14 +1502,11 @@ except ImportError:
 # Build real context from bim_json
 _errors_ctx = bim_json.get("errors", {})
 _top_issues_ctx = []
-if "results" in bim_json:
-    for r in bim_json["results"][:5]:
-        msg = r.get("message","") or r.get("Message","")
-        if msg: _top_issues_ctx.append(str(msg)[:100])
-if not _top_issues_ctx and df_results is not None and len(df_results) > 0:
-    for _, row in df_results.head(5).iterrows():
-        msg = str(row.get("Message","") or row.get("message",""))
-        if msg and msg != "nan": _top_issues_ctx.append(msg[:100])
+_bj_issues = bim_json.get("results", []) or bim_json.get("issues", []) or bim_json.get("errors_list", [])
+for _r in _bj_issues[:5]:
+    if isinstance(_r, dict):
+        _m = _r.get("message","") or _r.get("Message","") or _r.get("title","")
+        if _m: _top_issues_ctx.append(str(_m)[:100])
 
 _bench_ctx = ""
 if benchmark: _bench_ctx = benchmark.get("position","")
