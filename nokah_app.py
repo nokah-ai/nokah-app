@@ -766,18 +766,6 @@ if "nk_lang" not in st.session_state:
     st.session_state.nk_lang = "EN"
 if "nk_file" not in st.session_state:
     st.session_state.nk_file = None
-if "nk_access" not in st.session_state:
-    st.session_state.nk_access = False
-if "nk_plan" not in st.session_state:
-    st.session_state.nk_plan = None
-if "nk_code" not in st.session_state:
-    st.session_state.nk_code = None
-if "nk_access" not in st.session_state:
-    st.session_state.nk_access = False
-if "nk_plan" not in st.session_state:
-    st.session_state.nk_plan = None
-if "nk_code" not in st.session_state:
-    st.session_state.nk_code = None
 
 def _t(en, fr):
     return fr if st.session_state.nk_lang == "FR" else en
@@ -1010,117 +998,9 @@ st.markdown(f'''
 </div>
 ''', unsafe_allow_html=True)
 
-# ── Show remaining analyses for Starter plan ─────────────────────────────────
-if st.session_state.get("nk_access") and st.session_state.get("nk_plan") == "starter":
-    remaining = _get_remaining(st.session_state.nk_code)
-    if remaining is not None:
-        color = "#4ADE80" if remaining > 1 else "#FB923C" if remaining == 1 else "#F87171"
-        st.markdown(
-            f'<div style="text-align:right;font-size:12px;color:{color};margin-top:-1rem;margin-bottom:0.5rem;padding-right:1rem">'
-            f'{"⚠️ " if remaining <= 1 else ""}Starter — {remaining} analys{"is" if remaining <= 1 else "es"} remaining · '
-            f'<a href="https://nokah.ai/#pricing" target="_blank" style="color:#378ADD;text-decoration:none">Upgrade to Pro →</a></div>',
-            unsafe_allow_html=True
-        )
-
 # =========================================================
-# ACCESS CODE GATE
+# LANDING
 # =========================================================
-
-import json, hashlib, os
-
-CODES_FILE = "nk_codes.json"
-
-def _load_codes():
-    """Load codes database. Creates default if not exists."""
-    if not os.path.exists(CODES_FILE):
-        default = {
-            "NK-DEMO-2025": {"plan": "starter", "uses": 0, "max_uses": 3, "active": True},
-        }
-        with open(CODES_FILE, "w") as f:
-            json.dump(default, f)
-    with open(CODES_FILE, "r") as f:
-        return json.load(f)
-
-def _save_codes(codes):
-    with open(CODES_FILE, "w") as f:
-        json.dump(codes, f)
-
-def _validate_code(code):
-    """Returns (valid, plan, message) tuple."""
-    codes = _load_codes()
-    code = code.strip().upper()
-    if code not in codes:
-        return False, None, _t("Invalid access code.", "Code d'accès invalide.")
-    c = codes[code]
-    if not c.get("active", True):
-        return False, None, _t("This code has been deactivated.", "Ce code a été désactivé.")
-    if c["plan"] == "starter" and c["uses"] >= c["max_uses"]:
-        return False, None, _t(
-            f"This Starter code has reached its limit ({c['max_uses']} analyses).",
-            f"Ce code Starter a atteint sa limite ({c['max_uses']} analyses)."
-        )
-    return True, c["plan"], ""
-
-def _increment_use(code):
-    """Increment usage counter for a code."""
-    codes = _load_codes()
-    code = code.strip().upper()
-    if code in codes:
-        codes[code]["uses"] = codes[code].get("uses", 0) + 1
-        _save_codes(codes)
-
-def _get_remaining(code):
-    """Returns remaining analyses for a code (None = unlimited)."""
-    codes = _load_codes()
-    code = code.strip().upper()
-    if code not in codes:
-        return 0
-    c = codes[code]
-    if c["plan"] == "pro":
-        return None  # unlimited
-    return max(0, c["max_uses"] - c.get("uses", 0))
-
-# ── Access gate ───────────────────────────────────────────────────────────────
-if not st.session_state.nk_access:
-    _, col_gate, _ = st.columns([1, 2, 1])
-    with col_gate:
-        st.markdown("""
-        <div style="margin-top:3rem;text-align:center">
-            <div style="font-size:13px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;
-                color:#378ADD;margin-bottom:0.5rem">Access required</div>
-            <div style="font-size:22px;font-weight:600;color:#E2E8F0;margin-bottom:0.5rem">
-                Enter your access code</div>
-            <div style="font-size:14px;color:#64748B;margin-bottom:1.5rem">
-                Don't have a code?
-                <a href="https://nokah.ai/#cta" target="_blank"
-                style="color:#378ADD;text-decoration:none">Join the waitlist →</a>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        code_input = st.text_input(
-            "Access code",
-            placeholder="NK-STARTER-XXXX or NK-PRO-XXXX",
-            label_visibility="collapsed",
-            key="nk_code_input"
-        )
-        btn_access = st.button(_t("Access nokah →", "Accéder à nokah →"), use_container_width=True)
-
-        if btn_access and code_input:
-            valid, plan, msg = _validate_code(code_input)
-            if valid:
-                st.session_state.nk_access = True
-                st.session_state.nk_plan = plan
-                st.session_state.nk_code = code_input.strip().upper()
-                st.rerun()
-            else:
-                st.error(msg)
-        elif btn_access and not code_input:
-            st.warning(_t("Please enter an access code.", "Veuillez entrer un code d'accès."))
-
-    st.stop()
-
-
 
 if "nk_done" not in st.session_state:
     st.session_state.nk_done = False
@@ -1151,18 +1031,9 @@ if not st.session_state.nk_done:
         st.markdown('<div class="nk-hint">Supports IFC 2x3 and IFC 4</div>', unsafe_allow_html=True)
 
     if uploaded is not None:
-        # Check remaining analyses before allowing
-        remaining = _get_remaining(st.session_state.nk_code)
-        if remaining is not None and remaining <= 0:
-            st.error(_t(
-                "You have used all your analyses. Upgrade to Pro for unlimited access: [nokah.ai](https://nokah.ai/#pricing)",
-                "Vous avez utilisé toutes vos analyses. Passez en Pro pour un accès illimité : [nokah.ai](https://nokah.ai/#pricing)"
-            ))
-        else:
-            _increment_use(st.session_state.nk_code)
-            st.session_state.nk_file = uploaded
-            st.session_state.nk_done = True
-            st.rerun()
+        st.session_state.nk_file = uploaded
+        st.session_state.nk_done = True
+        st.rerun()
     st.stop()
 
 # =========================================================
@@ -1625,3 +1496,134 @@ with _btn_col:
         st.session_state.nk_file = None
         st.rerun()
 st.markdown("<div style='height:3rem'></div>", unsafe_allow_html=True)
+
+# =========================================================
+# CHAT BAR — nokah AI assistant
+# =========================================================
+
+# ── Build analysis context for chat ──────────────────────────────────────────
+_top_issues = []
+if 'results' in dir() and results:
+    for r in results[:5]:
+        if hasattr(r, 'message'):
+            _top_issues.append(r.message)
+        elif isinstance(r, dict):
+            _top_issues.append(r.get('message', str(r))[:80])
+
+_bench_pos = ""
+if 'bench_result' in dir() and bench_result:
+    _bench_pos = bench_result.get("position_label", "")
+elif 'benchmark_result' in dir() and benchmark_result:
+    _bench_pos = benchmark_result.get("position_label", "")
+
+_atypie_lbl = ""
+if 'ai_result' in dir() and ai_result and ai_result.get("available"):
+    _atypie_lbl = ai_result.get("label", "")
+
+_chat_analysis = {
+    "filename": uploaded.name if uploaded else "model",
+    "discipline": disc if 'disc' in dir() else "Unknown",
+    "score_global": round(score_global, 1) if 'score_global' in dir() else 0,
+    "score_metier": round(score_metier, 1) if 'score_metier' in dir() else 0,
+    "score_data_bim": round(score_data_bim, 1) if 'score_data_bim' in dir() else 0,
+    "n_critical": n_critical if 'n_critical' in dir() else 0,
+    "n_major": n_major if 'n_major' in dir() else 0,
+    "n_minor": n_minor if 'n_minor' in dir() else 0,
+    "top_issues": _top_issues,
+    "benchmark_position": _bench_pos,
+    "atypie_label": _atypie_lbl,
+}
+
+# ── Session state for chat history ───────────────────────────────────────────
+if "nk_chat_history" not in st.session_state:
+    st.session_state.nk_chat_history = []
+
+# ── Import chat engine ────────────────────────────────────────────────────────
+try:
+    from nokah_chat import get_chat_response
+    _chat_available = True
+except ImportError:
+    _chat_available = False
+
+# ── Chat UI ───────────────────────────────────────────────────────────────────
+st.markdown("""
+<div class="chat-wrap" style="padding-top:0;padding-bottom:0">
+  <div class="chat-row chat-row-left">
+    <div style="max-width:85%">
+      <div class="bubble-nokah">
+""" + '<div class="bk-label">nokah — Ask anything about your model</div>' + """
+        <div style="font-size:13px;color:#94A3B8;line-height:1.6">
+          Ask me about the issues, the score, what to fix first, how your model compares,
+          or any BIM / construction question.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+# Show chat history
+for msg in st.session_state.nk_chat_history:
+    if msg["role"] == "user":
+        st.markdown(
+            '<div class="chat-wrap" style="padding-top:0;padding-bottom:4px">'
+            '<div class="chat-row chat-row-right">'
+            '<div class="bubble-client" style="max-width:70%">'
+            f'<p style="margin:0;font-size:14px">{msg["content"]}</p>'
+            '</div></div></div>',
+            unsafe_allow_html=True
+        )
+    else:
+        import re as _re
+        # Convert **bold** to HTML
+        formatted = _re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', msg["content"])
+        formatted = formatted.replace('\n', '<br>')
+        source_badge = ""
+        if msg.get("source") == "groq":
+            source_badge = '<span style="font-size:10px;color:#22D3EE;float:right;margin-top:4px">⚡ AI</span>'
+        st.markdown(
+            '<div class="chat-wrap" style="padding-top:0;padding-bottom:4px">'
+            '<div class="chat-row chat-row-left">'
+            '<div class="bubble-nokah" style="max-width:85%">'
+            f'{source_badge}<p style="margin:0;font-size:14px;line-height:1.7">{formatted}</p>'
+            '</div></div></div>',
+            unsafe_allow_html=True
+        )
+
+# ── Input ─────────────────────────────────────────────────────────────────────
+_col_input, _col_btn = st.columns([5, 1])
+with _col_input:
+    _user_question = st.text_input(
+        "chat",
+        placeholder=_t(
+            "Ask about your model — issues, score, corrections, norms...",
+            "Posez une question sur votre maquette — anomalies, score, corrections, normes..."
+        ),
+        label_visibility="collapsed",
+        key="nk_chat_input"
+    )
+with _col_btn:
+    _send = st.button(_t("Send →", "Envoyer →"), use_container_width=True, key="nk_chat_send")
+
+if _send and _user_question.strip():
+    if _chat_available:
+        with st.spinner(_t("nokah is thinking...", "nokah réfléchit...")):
+            _response, _source = get_chat_response(
+                _user_question,
+                _chat_analysis,
+                st.session_state.nk_chat_history,
+                st.session_state.get("nk_lang", "EN")
+            )
+        st.session_state.nk_chat_history.append({"role": "user", "content": _user_question})
+        st.session_state.nk_chat_history.append({"role": "assistant", "content": _response, "source": _source})
+        st.rerun()
+    else:
+        st.error(_t("Chat module not available.", "Module chat non disponible."))
+
+# Clear chat button
+if st.session_state.nk_chat_history:
+    if st.button(_t("Clear conversation", "Effacer la conversation"), key="nk_chat_clear"):
+        st.session_state.nk_chat_history = []
+        st.rerun()
+
+st.markdown("<div style='height:4rem'></div>", unsafe_allow_html=True)
