@@ -766,6 +766,8 @@ if "nk_lang" not in st.session_state:
     st.session_state.nk_lang = "EN"
 if "nk_file" not in st.session_state:
     st.session_state.nk_file = None
+if "nk_chat_history" not in st.session_state:
+    st.session_state.nk_chat_history = []
 
 def _t(en, fr):
     return fr if st.session_state.nk_lang == "FR" else en
@@ -1405,9 +1407,6 @@ st.markdown(
 
 st.markdown('''<style>
 /* Expert mode expander — constrain to chat width, left-aligned */
-/* Hide JSON export subheader and download button in expert mode */
-[data-testid="stExpander"] [data-testid="stSubheader"] ~ [data-testid="stDownloadButton"],
-[data-testid="stExpander"] [data-testid="stDownloadButton"] { display: none !important; }
 [data-testid="stExpander"] {
     max-width: 650px !important;
     margin-left: calc((100% - 760px) / 2) !important;
@@ -1479,14 +1478,7 @@ with st.expander(_t("Expert mode — full results, JSON export, dataset stats",
         bc2.metric(_t("Park min","Min parc"),         f"{benchmark.get('score_min',0):.1f}")
         bc3.metric(_t("Park max","Max parc"),         f"{benchmark.get('score_max',0):.1f}")
         bc4.metric(_t("Models","Modèles"),            benchmark.get('nb_models', 0))
-        st.divider()
-    st.subheader(_t("JSON export","Export JSON"))
-    st.json(bim_json)
-    st.download_button(
-        _t("Download JSON","Télécharger JSON"),
-        data=bim_json_to_string(bim_json).encode("utf-8"),
-        file_name=f"{uploaded.name.replace('.ifc','')}_nokah.json",
-        mime="application/json")
+        # JSON export removed from UI (internal use only)
 
 # Right-align the button using columns
 # Align button with right edge of client bubbles (chat-wrap 760px, centered)
@@ -1498,139 +1490,105 @@ with _btn_col:
         st.session_state.nk_done = False
         st.session_state.nk_file = None
         st.rerun()
-st.markdown("<div style='height:3rem'></div>", unsafe_allow_html=True)
+st.markdown("<div style='height:2rem'></div>", unsafe_allow_html=True)
 
-# =========================================================
-# CHAT BAR — nokah AI assistant
-# =========================================================
-
-# ── Build analysis context for chat ──────────────────────────────────────────
-_top_issues = []
-if 'bim_json' in dir() and bim_json:
-    _all_issues = bim_json.get("issues", []) or bim_json.get("results", [])
-    for _iss in _all_issues[:5]:
-        if isinstance(_iss, dict):
-            _msg = _iss.get("message","") or _iss.get("Message","") or _iss.get("title","")
-            if _msg: _top_issues.append(str(_msg)[:100])
-if not _top_issues and 'df_results' in dir() and df_results is not None and len(df_results) > 0:
-    for _, _row in df_results.head(5).iterrows():
-        _msg = _row.get("Message","") or _row.get("message","")
-        if _msg: _top_issues.append(str(_msg)[:100])
-
-_bench_pos = ""
-if 'benchmark' in dir() and benchmark:
-    _bench_pos = benchmark.get("position", "")
-
-_atypie_lbl = ""
-if 'ai_result' in dir() and ai_result and ai_result.get("available"):
-    _lbl_map = {"Normal":"Normal","Atypique":"Atypical","Très atypique":"Very atypical"}
-    _atypie_lbl = _lbl_map.get(ai_result.get("label",""), ai_result.get("label",""))
-
-_chat_analysis = {
-    "filename": uploaded.name if uploaded else "model",
-    "discipline": _disc_en(primary) if 'primary' in dir() else "Unknown",
-    "score_global": round(score_global, 1) if 'score_global' in dir() else 0,
-    "score_metier": round(score_metier, 1) if 'score_metier' in dir() else 0,
-    "score_data_bim": round(score_data, 1) if 'score_data' in dir() else 0,
-    "n_critical": bim_json.get("errors",{}).get("critical",0) if 'bim_json' in dir() else 0,
-    "n_major": bim_json.get("errors",{}).get("major",0) if 'bim_json' in dir() else 0,
-    "n_minor": bim_json.get("errors",{}).get("minor",0) if 'bim_json' in dir() else 0,
-    "top_issues": _top_issues,
-    "benchmark_position": _bench_pos,
-    "atypie_label": _atypie_lbl,
-    "objects": bim_json.get("objects", {}) if 'bim_json' in dir() else {},
-}
-
-# ── Session state for chat history ───────────────────────────────────────────
-if "nk_chat_history" not in st.session_state:
-    st.session_state.nk_chat_history = []
-
-# ── Import chat engine ────────────────────────────────────────────────────────
+# ── CHAT BAR ──────────────────────────────────────────────────────────────────
 try:
     from nokah_chat import get_chat_response
-    _chat_available = True
+    _chat_ok = True
 except ImportError:
-    _chat_available = False
+    _chat_ok = False
 
-# ── Chat UI ───────────────────────────────────────────────────────────────────
-st.markdown("""
-<div class="chat-wrap" style="padding-top:0;padding-bottom:0">
-  <div class="chat-row chat-row-left">
-    <div style="max-width:85%">
-      <div class="bubble-nokah">
-""" + '<div class="bk-label">nokah — Ask anything about your model</div>' + """
-        <div style="font-size:13px;color:#94A3B8;line-height:1.6">
-          Ask me about the issues, the score, what to fix first, how your model compares,
-          or any BIM / construction question.
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+# Build real context from bim_json
+_errors_ctx = bim_json.get("errors", {})
+_top_issues_ctx = []
+if "results" in bim_json:
+    for r in bim_json["results"][:5]:
+        msg = r.get("message","") or r.get("Message","")
+        if msg: _top_issues_ctx.append(str(msg)[:100])
+if not _top_issues_ctx and df_results is not None and len(df_results) > 0:
+    for _, row in df_results.head(5).iterrows():
+        msg = str(row.get("Message","") or row.get("message",""))
+        if msg and msg != "nan": _top_issues_ctx.append(msg[:100])
 
-# Show chat history
-for msg in st.session_state.nk_chat_history:
-    if msg["role"] == "user":
+_bench_ctx = ""
+if benchmark: _bench_ctx = benchmark.get("position","")
+
+_atypie_ctx = ""
+if ai_result and ai_result.get("available"):
+    _lmap = {"Normal":"Normal","Atypique":"Atypical","Très atypique":"Very atypical"}
+    _atypie_ctx = _lmap.get(ai_result.get("label",""), "")
+
+_chat_ctx = {
+    "filename": uploaded.name,
+    "discipline": _disc_en(primary),
+    "score_global": round(score_global, 1),
+    "score_metier": round(score_metier, 1),
+    "score_data_bim": round(score_data, 1),
+    "n_critical": _errors_ctx.get("critical", 0),
+    "n_major": _errors_ctx.get("major", 0),
+    "n_minor": _errors_ctx.get("minor", 0),
+    "top_issues": _top_issues_ctx,
+    "benchmark_position": _bench_ctx,
+    "atypie_label": _atypie_ctx,
+    "objects": bim_json.get("objects", {}),
+}
+
+st.markdown(
+    '<div class="chat-wrap" style="padding-top:0;padding-bottom:0">' +
+    '<div class="chat-row chat-row-left"><div style="max-width:85%">' +
+    '<div class="bubble-nokah">' +
+    '<div class="bk-label">nokah — ' + _t("Ask anything about your model","Posez vos questions sur votre maquette") + '</div>' +
+    '<div style="font-size:13px;color:#94A3B8">' +
+    _t("Issues · Score · What to fix · Norms · Compare to other models",
+       "Anomalies · Score · Quoi corriger · Normes · Comparer aux autres maquettes") +
+    '</div></div></div></div></div>',
+    unsafe_allow_html=True
+)
+
+for _msg in st.session_state.nk_chat_history:
+    if _msg["role"] == "user":
         st.markdown(
-            '<div class="chat-wrap" style="padding-top:0;padding-bottom:4px">'
-            '<div class="chat-row chat-row-right">'
-            '<div class="bubble-client" style="max-width:70%">'
-            f'<p style="margin:0;font-size:14px">{msg["content"]}</p>'
-            '</div></div></div>',
-            unsafe_allow_html=True
-        )
+            '<div class="chat-wrap" style="padding-top:0;padding-bottom:4px">' +
+            '<div class="chat-row chat-row-right">' +
+            '<div class="bubble-client" style="max-width:70%">' +
+            f'<p style="margin:0;font-size:14px">{_msg["content"]}</p>' +
+            '</div></div></div>', unsafe_allow_html=True)
     else:
         import re as _re
-        # Convert **bold** to HTML
-        formatted = _re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', msg["content"])
-        formatted = formatted.replace('\n', '<br>')
-        source_badge = ""
-        if msg.get("source") == "groq":
-            source_badge = '<span style="font-size:10px;color:#22D3EE;float:right;margin-top:4px">⚡ AI</span>'
+        _fmt = _re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', _msg["content"])
+        _fmt = _fmt.replace('\n', '<br>')
+        _badge = '<span style="font-size:10px;color:#22D3EE;float:right">⚡ AI</span>' if _msg.get("source") == "groq" else ""
         st.markdown(
-            '<div class="chat-wrap" style="padding-top:0;padding-bottom:4px">'
-            '<div class="chat-row chat-row-left">'
-            '<div class="bubble-nokah" style="max-width:85%">'
-            f'{source_badge}<p style="margin:0;font-size:14px;line-height:1.7">{formatted}</p>'
-            '</div></div></div>',
-            unsafe_allow_html=True
-        )
+            '<div class="chat-wrap" style="padding-top:0;padding-bottom:4px">' +
+            '<div class="chat-row chat-row-left">' +
+            '<div class="bubble-nokah" style="max-width:85%">' +
+            _badge + f'<p style="margin:0;font-size:14px;line-height:1.7">{_fmt}</p>' +
+            '</div></div></div>', unsafe_allow_html=True)
 
-# ── Input ─────────────────────────────────────────────────────────────────────
-_col_input, _col_btn = st.columns([5, 1])
-with _col_input:
-    _user_question = st.text_input(
-        "chat",
-        placeholder=_t(
-            "Ask about your model — issues, score, corrections, norms...",
-            "Posez une question sur votre maquette — anomalies, score, corrections, normes..."
-        ),
-        label_visibility="collapsed",
-        key="nk_chat_input"
-    )
-with _col_btn:
-    _send = st.button(_t("Send →", "Envoyer →"), use_container_width=True, key="nk_chat_send")
+_ci, _cb = st.columns([5, 1])
+with _ci:
+    _q = st.text_input("chat",
+        placeholder=_t("Ask about issues, score, corrections, norms...",
+                       "Anomalies, score, corrections, normes..."),
+        label_visibility="collapsed", key="nk_chat_input")
+with _cb:
+    _send = st.button(_t("Send →","Envoyer →"), use_container_width=True, key="nk_send")
 
-if _send and _user_question.strip():
-    if _chat_available:
-        with st.spinner(_t("nokah is thinking...", "nokah réfléchit...")):
-            _response, _source = get_chat_response(
-                _user_question,
-                _chat_analysis,
-                st.session_state.nk_chat_history,
-                st.session_state.get("nk_lang", "EN")
-            )
-        st.session_state.nk_chat_history.append({"role": "user", "content": _user_question})
-        st.session_state.nk_chat_history.append({"role": "assistant", "content": _response, "source": _source})
-        st.rerun()
-    else:
-        st.error(_t("Chat module not available.", "Module chat non disponible."))
+if _send and _q.strip() and _chat_ok:
+    with st.spinner(_t("nokah is thinking...","nokah réfléchit...")):
+        _resp, _src = get_chat_response(_q, _chat_ctx,
+            st.session_state.nk_chat_history,
+            st.session_state.get("nk_lang","EN"))
+    st.session_state.nk_chat_history.append({"role":"user","content":_q})
+    st.session_state.nk_chat_history.append({"role":"assistant","content":_resp,"source":_src})
+    st.rerun()
+elif _send and _q.strip() and not _chat_ok:
+    st.error("nokah_chat.py not found.")
 
-# Clear chat button
 if st.session_state.nk_chat_history:
-    if st.button(_t("Clear conversation", "Effacer la conversation"), key="nk_chat_clear"):
+    if st.button(_t("Clear","Effacer"), key="nk_clear"):
         st.session_state.nk_chat_history = []
         st.rerun()
 
-st.markdown("<div style='height:4rem'></div>", unsafe_allow_html=True)
+st.markdown("<div style='height:3rem'></div>", unsafe_allow_html=True)
