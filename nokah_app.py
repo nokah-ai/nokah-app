@@ -1483,21 +1483,6 @@ with st.expander(_t("Expert mode — full results, JSON export, dataset stats",
 # Upload another IFC → use + button in sticky chat bar
 st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
 
-# ── CHAT BAR ──────────────────────────────────────────────────────────────────
-import os as _os
-try:
-    from nokah_chat import get_chat_response
-    _chat_ok = True
-except ImportError:
-    _chat_ok = False
-
-# Pass Groq key via env so nokah_chat.py can access it
-try:
-    _gk = st.secrets.get("GROQ_API_KEY", "")
-    if _gk: _os.environ["GROQ_API_KEY"] = _gk
-except Exception:
-    pass
-
 # Build real context from bim_json
 _errors_ctx = bim_json.get("errors", {})
 _top_issues_ctx = []
@@ -1532,57 +1517,59 @@ _chat_ctx = {
     "objects": bim_json.get("objects", {}),
 }
 
-st.markdown(
-    '<div class="chat-wrap" style="padding-top:0;padding-bottom:0">' +
-    '<div class="chat-row chat-row-left"><div style="max-width:85%">' +
-    '<div class="bubble-nokah">' +
-    '<div class="bk-label">nokah — ' + _t("Ask anything about your model","Posez vos questions sur votre maquette") + '</div>' +
-    '<div style="font-size:13px;color:#94A3B8">' +
-    _t("Issues · Score · What to fix · Norms · Compare to other models",
-       "Anomalies · Score · Quoi corriger · Normes · Comparer aux autres maquettes") +
-    '</div></div></div></div></div>',
-    unsafe_allow_html=True
-)
-
-
-for _msg in st.session_state.nk_chat_history:
-    if _msg["role"] == "user":
-        st.markdown(
-            '<div class="chat-wrap" style="padding-top:0;padding-bottom:4px">' +
-            '<div class="chat-row chat-row-right">' +
-            '<div class="bubble-client" style="max-width:70%">' +
-            f'<p style="margin:0;font-size:14px">{_msg["content"]}</p>' +
-            '</div></div></div>', unsafe_allow_html=True)
-    else:
-        import re as _re
-        _fmt = _re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', _msg["content"])
-        _fmt = _fmt.replace('\n', '<br>')
-        _badge = '<span style="font-size:10px;color:#22D3EE;float:right">⚡ AI</span>' if _msg.get("source") == "groq" else ""
-        st.markdown(
-            '<div class="chat-wrap" style="padding-top:0;padding-bottom:4px">' +
-            '<div class="chat-row chat-row-left">' +
-            '<div class="bubble-nokah" style="max-width:85%">' +
-            _badge + f'<p style="margin:0;font-size:14px;line-height:1.7">{_fmt}</p>' +
-            '</div></div></div>', unsafe_allow_html=True)
-
 # ── CHAT SECTION ─────────────────────────────────────────────────────────────
-import os as _os
+import os as _os, random as _random, re as _re2, requests as _requests
+
+# Read Groq key directly from st.secrets (available here in main script)
+_groq_key = ""
 try:
-    from nokah_chat import get_chat_response
+    _groq_key = st.secrets["GROQ_API_KEY"]
+except Exception:
+    pass
+
+def _call_groq_direct(question, analysis, history, lang):
+    """Call Groq directly from nokah_app.py where st.secrets is accessible."""
+    if not _groq_key:
+        return None
+    try:
+        fr = lang == "FR"
+        system = f"""You are nokah, an AI specialized in BIM quality analysis only.
+Model: {analysis.get('filename','unknown')} | Discipline: {analysis.get('discipline','unknown')}
+Score: {analysis.get('score_global',0):.1f}/100 | Technical: {analysis.get('score_metier',0):.1f}/100 | BIM data: {analysis.get('score_data_bim',0):.1f}/100
+Critical: {analysis.get('n_critical',0)} | Major: {analysis.get('n_major',0)} | Minor: {analysis.get('n_minor',0)}
+Top issues: {", ".join(analysis.get('top_issues',[])[:5])}
+Benchmark: {analysis.get('benchmark_position','N/A')}
+RULES: Only answer BIM/construction/IFC questions. Redirect off-topic questions. Never invent data. Respond in {"French" if fr else "English"}. Be concise and precise."""
+        msgs = [{"role":"system","content":system}]
+        for m in history[-6:]:
+            msgs.append({"role":m["role"],"content":m["content"]})
+        msgs.append({"role":"user","content":question})
+        r = _requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization":f"Bearer {_groq_key}","Content-Type":"application/json"},
+            json={"model":"llama-3.3-70b-versatile","messages":msgs,"temperature":0.7,"max_tokens":600},
+            timeout=15
+        )
+        if r.status_code == 200:
+            return r.json()["choices"][0]["message"]["content"].strip()
+        return None
+    except Exception:
+        return None
+
+try:
+    from nokah_chat import generate_local_response
     _chat_ok = True
 except ImportError:
     _chat_ok = False
+    def generate_local_response(q, a, lang="EN"):
+        return "Chat module unavailable." if lang != "FR" else "Module chat indisponible."
 
-# Inject Groq key into os.environ so nokah_chat.py can access it
-try:
-    _gk = st.secrets["GROQ_API_KEY"]
-    if _gk: _os.environ["GROQ_API_KEY"] = _gk
-except Exception:
-    try:
-        _gk = st.secrets.get("GROQ_API_KEY", "")
-        if _gk: _os.environ["GROQ_API_KEY"] = _gk
-    except Exception:
-        pass
+def _get_response(question, analysis, history, lang):
+    """Try Groq first, fallback to local."""
+    resp = _call_groq_direct(question, analysis, history, lang)
+    if resp:
+        return resp, "groq"
+    return generate_local_response(question, analysis, lang), "local"
 
 # Build real context from bim_json
 _errors_ctx = bim_json.get("errors", {})
@@ -1690,7 +1677,7 @@ _q = st.chat_input(
 
 if _q and _q.strip() and _chat_ok:
     with st.spinner(_t("nokah is thinking...", "nokah réfléchit...")):
-        _resp, _src = get_chat_response(_q, _chat_ctx,
+        _resp, _src = _get_response(_q, _chat_ctx,
             st.session_state.nk_chat_history,
             st.session_state.get("nk_lang","EN"))
     st.session_state.nk_chat_history.append({"role":"user","content":_q})
