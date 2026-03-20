@@ -375,14 +375,15 @@ IMPORTANT RULES:
     return messages
 
 
-def call_groq(question: str, analysis: dict, history: list, lang: str) -> str | None:
+def call_groq(question: str, analysis: dict, history: list, lang: str, api_key: str = "") -> str | None:
     """
     Appelle l'API Groq si la clé est disponible.
     Retourne None si pas de clé ou erreur.
     """
     try:
-        import streamlit as st
-        api_key = st.secrets.get("GROQ_API_KEY", "") or os.environ.get("GROQ_API_KEY", "")
+        # Use provided key, fallback to env
+        if not api_key:
+            api_key = os.environ.get("GROQ_API_KEY", "")
         if not api_key:
             return None
 
@@ -413,13 +414,13 @@ def call_groq(question: str, analysis: dict, history: list, lang: str) -> str | 
         return None
 
 
-def get_chat_response(question: str, analysis: dict, history: list, lang: str = "EN") -> tuple[str, str]:
+def get_chat_response(question: str, analysis: dict, history: list, lang: str = "EN", groq_key: str = "") -> tuple[str, str]:
     """
     Point d'entrée principal du chat.
     Retourne (réponse, source) où source = "groq" ou "local"
     """
     # Essayer Groq d'abord
-    groq_response = call_groq(question, analysis, history, lang)
+    groq_response = call_groq(question, analysis, history, lang, api_key=groq_key)
     if groq_response:
         return groq_response, "groq"
 
