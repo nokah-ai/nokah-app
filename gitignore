@@ -1,0 +1,19 @@
+# nokah — données sensibles (ne jamais commiter)
+
+# Dataset BIM propriétaire
+bim_dataset.csv
+
+# Codes d'accès clients
+nk_codes.json
+
+# Clés API et secrets
+.env
+*.env
+secrets.toml
+.streamlit/secrets.toml
+
+# Fichiers temporaires
+*.tmp
+*.pyc
+__pycache__/
+.DS_Store
