@@ -1581,16 +1581,17 @@ div[data-testid="stChatInput"] > div {
     border-radius:24px !important; background:#1E293B !important;
 }
 section[data-testid="stMain"] .block-container { padding-bottom:90px !important; }
+/* Disclaimer below sticky bar */
+div[data-testid="stBottom"]::after {
+    content: "nokah est une IA et peut faire des erreurs. Veuillez vérifier les réponses.";
+    display: block; text-align: center;
+    font-size: 11px; color: #475569;
+    padding: 2px 0 3px 0;
+    background: inherit;
+}
 </style>""", unsafe_allow_html=True)
 
-# Disclaimer
-st.markdown(
-    '<div style="text-align:center;font-size:11px;color:#475569;margin-bottom:4px">' +
-    _t("nokah is an AI and may make mistakes. Please verify responses.",
-       "nokah est une IA et peut faire des erreurs. Veuillez vérifier les réponses.") +
-    '</div>',
-    unsafe_allow_html=True
-)
+# (disclaimer shown below chat bar via CSS)
 
 # Plus button
 _, _plus_col = st.columns([12, 1])

@@ -410,7 +410,11 @@ def call_groq(question: str, analysis: dict, history: list, lang: str, api_key: 
         return None
 
     except Exception as _e:
-        # Return None silently — local fallback will handle it
+        import streamlit as _st
+        try:
+            _st.sidebar.error(f"Groq error: {type(_e).__name__}: {str(_e)[:100]}")
+        except Exception:
+            pass
         return None
 
 
