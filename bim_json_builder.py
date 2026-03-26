@@ -18,20 +18,6 @@ def build_bim_json(
     df_top,
     df_dataset=None,
 ) -> dict:
-    """
-    Construit un dict JSON structuré à partir des résultats d'analyse.
-
-    Paramètres :
-    - ifc_name   : nom du fichier IFC
-    - discipline : dict retourné par detect_discipline()
-    - score_map  : dict scores {'Global', 'Metier', 'Data BIM', 'Accepted_Check'}
-    - counts     : dict comptage objets
-    - df_all     : DataFrame complet des résultats
-    - df_top     : DataFrame top anomalies
-    - df_dataset : DataFrame dataset historique (pour benchmark)
-
-    Retourne un dict JSON sérialisable.
-    """
 
     # ── Scores ────────────────────────────────────────────
     score_global  = round(score_map.get("Global", 0), 2)
@@ -48,22 +34,15 @@ def build_bim_json(
     errors_total = errors_critical + errors_major + errors_minor
 
     # ── Objets ────────────────────────────────────────────
-    # Objets archi de base
     archi_total = (counts.get("walls", 0) + counts.get("doors", 0) +
                    counts.get("windows", 0) + counts.get("slabs", 0) +
                    counts.get("railings", 0))
-
-    # Objets MEP (préfixe mep_)
     mep_total = (counts.get("mep_count_mep", 0) +
                  counts.get("mep_count_ducts", 0) +
                  counts.get("mep_count_pipes", 0) +
                  counts.get("mep_count_terminals", 0) +
                  counts.get("mep_count_equip", 0))
-
-    # Objets structure (préfixe str_)
     str_total = counts.get("str_count_structural", 0)
-
-    # Total tous objets connus (dédupliqué au mieux possible)
     total_objects = max(archi_total, 1) if archi_total > 0 else max(mep_total + str_total, 1)
     if archi_total > 0 and (mep_total + str_total) > 0:
         total_objects = archi_total + mep_total + str_total
@@ -87,30 +66,27 @@ def build_bim_json(
     # ── Benchmark ─────────────────────────────────────────
     benchmark = None
     if df_dataset is not None and not df_dataset.empty and len(df_dataset) > 1:
-        score_moyen = round(df_dataset["score_global"].mean(), 2)
-        score_min   = round(df_dataset["score_global"].min(), 2)
-        score_max   = round(df_dataset["score_global"].max(), 2)
-        delta       = round(score_global - score_moyen, 2)
-        position    = "above_average" if delta >= 0 else "below_average"
         try:
-            df_reset = df_dataset.reset_index(drop=True)
-            ranks_series = df_reset["score_global"].rank(ascending=False, method="min")
-            matches = df_reset.index[df_reset["score_global"] == score_global].tolist()
-            if matches and len(matches) > 0 and matches[-1] < len(ranks_series):
-                rank = int(ranks_series.iat[matches[-1]])
-            else:
-                rank = None
-        except Exception:
-            rank = None
+            scores = df_dataset["score_global"].dropna().values.tolist()
+            score_moyen = round(sum(scores) / len(scores), 2)
+            score_min   = round(min(scores), 2)
+            score_max   = round(max(scores), 2)
+            delta       = round(score_global - score_moyen, 2)
+            position    = "above_average" if delta >= 0 else "below_average"
+            # Rank = combien de modèles ont un meilleur score
+            rank = sum(1 for s in scores if s > score_global) + 1
 
-        benchmark = {
-            "nb_models":    len(df_dataset),
-            "score_moyen":  score_moyen,
-            "score_min":    score_min,
-            "score_max":    score_max,
-            "delta_vs_mean": delta,
-            "position":     position,
-        }
+            benchmark = {
+                "nb_models":     len(scores),
+                "score_moyen":   score_moyen,
+                "score_min":     score_min,
+                "score_max":     score_max,
+                "delta_vs_mean": delta,
+                "position":      position,
+                "rank":          rank,
+            }
+        except Exception:
+            benchmark = None
 
     # ── Discipline ────────────────────────────────────────
     discipline_info = {
