@@ -8,9 +8,6 @@ DATASET_FILE = "bim_dataset.csv"
 COLUMNS = [
     "file",
     "file_hash",
-    "model_scope",
-    "is_benchmark_eligible",
-    "discipline_primary",
     "score_global",
     "score_metier",
     "score_data",
@@ -66,7 +63,7 @@ def check_duplicate(ifc_name: str, file_hash: str, df: pd.DataFrame) -> dict:
     if matches.empty:
         return {"is_duplicate": False, "type": None, "message": "", "existing_file": None, "existing_date": None}
 
-    existing = matches.iloc[-1]  # dernière occurrence connue
+    existing = matches.reset_index(drop=True).iloc[-1]  # dernière occurrence connue
     existing_file = existing["file"]
     existing_date = str(existing["date"])
 
@@ -94,22 +91,18 @@ def update_dataset(
     scores: dict,
     counts: dict,
     df_results,
-    scope_info: dict = None,
-    discipline_info: dict = None,
     force: bool = False
 ) -> dict:
     """
     Ajoute une ligne dans le dataset BIM après chaque analyse.
 
     Paramètres :
-    - ifc_name       : nom du fichier IFC (str)
-    - ifc_path       : chemin local vers le fichier IFC (pour le hash SHA256)
-    - scores         : dict avec clés 'Global', 'Metier', 'Data BIM'
-    - counts         : dict avec clés 'walls', 'doors', 'windows', 'slabs', 'railings'
-    - df_results     : DataFrame complet des résultats d'analyse
-    - scope_info     : dict retourné par model_scope_detector.detect_model_scope()
-    - discipline_info: dict retourné par discipline_detector.detect_discipline()
-    - force          : si True, remplace l'ancienne entrée en cas de doublon
+    - ifc_name    : nom du fichier IFC (str)
+    - ifc_path    : chemin local vers le fichier IFC (pour le hash SHA256)
+    - scores      : dict avec clés 'Global', 'Metier', 'Data BIM'
+    - counts      : dict avec clés 'walls', 'doors', 'windows', 'slabs', 'railings'
+    - df_results  : DataFrame complet des résultats d'analyse
+    - force       : si True, remplace l'ancienne entrée en cas de doublon
 
     Retourne un dict avec :
     - "status"    : "added" | "duplicate_blocked" | "duplicate_replaced"
@@ -146,17 +139,10 @@ def update_dataset(
         errors_minor    = int((fail_df["Priority"] == "Minor").sum())
     errors_total = errors_critical + errors_major + errors_minor
 
-    model_scope           = scope_info.get("scope", "Unknown") if scope_info else "Unknown"
-    is_benchmark_eligible = scope_info.get("is_benchmark_eligible", True) if scope_info else True
-    discipline_primary    = discipline_info.get("primary", "Unknown") if discipline_info else "Unknown"
-
     row = {
-        "file":                  ifc_name,
-        "file_hash":             file_hash,
-        "model_scope":           model_scope,
-        "is_benchmark_eligible": is_benchmark_eligible,
-        "discipline_primary":    discipline_primary,
-        "score_global":          scores.get("Global", 0),
+        "file":            ifc_name,
+        "file_hash":       file_hash,
+        "score_global":    scores.get("Global", 0),
         "score_metier":    scores.get("Metier", 0),
         "score_data":      scores.get("Data BIM", 0),
         "walls":           counts.get("walls", 0),
