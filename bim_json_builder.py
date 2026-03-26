@@ -92,12 +92,18 @@ def build_bim_json(
         score_max   = round(df_dataset["score_global"].max(), 2)
         delta       = round(score_global - score_moyen, 2)
         position    = "above_average" if delta >= 0 else "below_average"
-        rank        = int(
-            df_dataset["score_global"]
-            .rank(ascending=False, method="min")
-            .iloc[df_dataset.index[df_dataset["score_global"] == score_global].tolist()[-1]
-                  if score_global in df_dataset["score_global"].values else -1]
-        ) if score_global in df_dataset["score_global"].values else None
+        try:
+            matching = df_dataset.index[df_dataset["score_global"] == score_global].tolist()
+            if matching:
+                rank = int(
+                    df_dataset["score_global"]
+                    .rank(ascending=False, method="min")
+                    .iloc[matching[-1]]
+                )
+            else:
+                rank = None
+        except Exception:
+            rank = None
 
         benchmark = {
             "nb_models":    len(df_dataset),
