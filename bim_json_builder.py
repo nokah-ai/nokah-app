@@ -93,13 +93,10 @@ def build_bim_json(
         delta       = round(score_global - score_moyen, 2)
         position    = "above_average" if delta >= 0 else "below_average"
         try:
+            ranks = df_dataset["score_global"].rank(ascending=False, method="min")
             matching = df_dataset.index[df_dataset["score_global"] == score_global].tolist()
             if matching:
-                rank = int(
-                    df_dataset["score_global"]
-                    .rank(ascending=False, method="min")
-                    .iloc[matching[-1]]
-                )
+                rank = int(ranks.loc[matching[-1]])
             else:
                 rank = None
         except Exception:
