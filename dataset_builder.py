@@ -91,7 +91,10 @@ def update_dataset(
     scores: dict,
     counts: dict,
     df_results,
-    force: bool = False
+    force: bool = False,
+    scope_info=None,
+    discipline_info=None,
+    **kwargs
 ) -> dict:
     """
     Ajoute une ligne dans le dataset BIM après chaque analyse.
