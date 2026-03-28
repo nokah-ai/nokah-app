@@ -20,6 +20,7 @@ from bim_ai_v1 import run_anomaly_detection
 from bim_summary import generate_summary
 
 import base64
+from freemium import init_session, can_analyze, increment_counter, render_analysis_counter, render_paywall
 
 from dataset_builder import update_dataset, load_dataset
 from discipline_detector import detect_discipline, discipline_badge
@@ -758,6 +759,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+    init_session()
 
 # ── Session state init (must be before any st.* call) ────────────────────────
 if "nk_done" not in st.session_state:
@@ -1032,7 +1034,11 @@ if not st.session_state.nk_done:
             key="nk_uploader")
         st.markdown('<div class="nk-hint">Supports IFC 2x3 and IFC 4</div>', unsafe_allow_html=True)
 
-    if uploaded is not None:
+            render_analysis_counter()
+                if not can_analyze():
+                                render_paywall()
+                                st.stop()
+                    if uploaded is not None:
         st.session_state.nk_file = uploaded
         st.session_state.nk_done = True
         st.rerun()
@@ -1058,6 +1064,7 @@ if _cache_key not in st.session_state or st.session_state.get("nk_last_file") !=
         st.session_state[_cache_key] = _analysis
         st.session_state["nk_tmp_path"] = tmp_path
         st.session_state["nk_last_file"] = uploaded.name
+                increment_counter()
 
 analysis = st.session_state[_cache_key]
 tmp_path  = st.session_state.get("nk_tmp_path", "")
