@@ -760,6 +760,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 init_session()
+
 # ── Session state init (must be before any st.* call) ────────────────────────
 if "nk_done" not in st.session_state:
     st.session_state.nk_done = False
@@ -1033,14 +1034,15 @@ if not st.session_state.nk_done:
             key="nk_uploader")
         st.markdown('<div class="nk-hint">Supports IFC 2x3 and IFC 4</div>', unsafe_allow_html=True)
 
-            render_analysis_counter()
-                if not can_analyze():
-                                render_paywall()
-                                st.stop()
-                    if uploaded is not None:
-        st.session_state.nk_file = uploaded
-        st.session_state.nk_done = True
-        st.rerun()
+        render_analysis_counter()
+        if not can_analyze():
+            render_paywall()
+            st.stop()
+        if uploaded is not None:
+            increment_counter()
+            st.session_state.nk_file = uploaded
+            st.session_state.nk_done = True
+            st.rerun()
     st.stop()
 
 # =========================================================
@@ -1063,7 +1065,6 @@ if _cache_key not in st.session_state or st.session_state.get("nk_last_file") !=
         st.session_state[_cache_key] = _analysis
         st.session_state["nk_tmp_path"] = tmp_path
         st.session_state["nk_last_file"] = uploaded.name
-                increment_counter()
 
 analysis = st.session_state[_cache_key]
 tmp_path  = st.session_state.get("nk_tmp_path", "")
