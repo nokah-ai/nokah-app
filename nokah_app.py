@@ -759,8 +759,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
-    init_session()
-
+init_session()
 # ── Session state init (must be before any st.* call) ────────────────────────
 if "nk_done" not in st.session_state:
     st.session_state.nk_done = False
