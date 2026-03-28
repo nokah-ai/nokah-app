@@ -8,7 +8,7 @@ import streamlit as st
 FREE_ANALYSES = 3
 STARTER_BONUS = 3
 APP_URL = "https://nokah-app-8ecvxvmgro2m7jv6aszjjs.streamlit.app"
-STRIPE_STARTER = "STRIPE_STARTER_PLACEHOLDER"
+STRIPE_STARTER = "https://buy.stripe.com/14A3cp4pn7fggHtdeyb7y01"
 STRIPE_PRO     = "https://buy.stripe.com/3cIeV79JHbvwaj56Qab7y00"
 
 ACCESS_CODES = {
