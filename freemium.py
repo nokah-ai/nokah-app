@@ -1,13 +1,14 @@
 """
 nokah — Freemium Module
-Gère le compteur d'analyses gratuites et la page de blocage
+Compteur persistant via cookies navigateur + page de blocage
 """
 import streamlit as st
+import json
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 FREE_ANALYSES = 3
 STARTER_BONUS = 3
-APP_URL = "https://nokah-app-8ecvxvmgro2m7jv6aszjjs.streamlit.app"
+APP_URL        = "https://nokah-app-8ecvxvmgro2m7jv6aszjjs.streamlit.app"
 STRIPE_STARTER = "https://buy.stripe.com/14A3cp4pn7fggHtdeyb7y01"
 STRIPE_PRO     = "https://buy.stripe.com/3cIeV79JHbvwaj56Qab7y00"
 
@@ -18,36 +19,152 @@ ACCESS_CODES = {
     "NK-ELIOTT":  {"plan": "starter", "extra_analyses": STARTER_BONUS},
 }
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Cookie JS helpers ──────────────────────────────────────────────────────────
+_COOKIE_READER = """
+<script>
+(function() {
+    function getCookie(name) {
+        const v = document.cookie.split('; ').find(r => r.startsWith(name + '='));
+        return v ? decodeURIComponent(v.split('=')[1]) : null;
+    }
+    function setCookie(name, value, days) {
+        const d = new Date();
+        d.setTime(d.getTime() + days*24*60*60*1000);
+        document.cookie = name + '=' + encodeURIComponent(value) + ';expires=' + d.toUTCString() + ';path=/';
+    }
+
+    // Lire le cookie existant
+    const raw = getCookie('nokah_freemium');
+    const data = raw ? JSON.parse(raw) : {count: 0, plan: 'free', extra: 0};
+
+    // Injecter dans un input caché pour que Streamlit puisse le lire
+    let inp = document.getElementById('nokah_cookie_bridge');
+    if (!inp) {
+        inp = document.createElement('input');
+        inp.type = 'hidden';
+        inp.id = 'nokah_cookie_bridge';
+        document.body.appendChild(inp);
+    }
+    inp.value = JSON.stringify(data);
+
+    // Exposer globalement pour les mises à jour
+    window._nokahData = data;
+    window._nokahSetCookie = function(data) {
+        setCookie('nokah_freemium', JSON.stringify(data), 365);
+        window._nokahData = data;
+    };
+})();
+</script>
+"""
+
+_COOKIE_INCREMENT = """
+<script>
+(function() {
+    function getCookie(name) {
+        const v = document.cookie.split('; ').find(r => r.startsWith(name + '='));
+        return v ? decodeURIComponent(v.split('=')[1]) : null;
+    }
+    function setCookie(name, value, days) {
+        const d = new Date();
+        d.setTime(d.getTime() + days*24*60*60*1000);
+        document.cookie = name + '=' + encodeURIComponent(value) + ';expires=' + d.toUTCString() + ';path=/';
+    }
+    const raw = getCookie('nokah_freemium');
+    const data = raw ? JSON.parse(raw) : {count: 0, plan: 'free', extra: 0};
+    data.count = (data.count || 0) + 1;
+    setCookie('nokah_freemium', JSON.stringify(data), 365);
+})();
+</script>
+"""
+
+def _make_apply_code_js(plan, extra):
+    return f"""
+<script>
+(function() {{
+    function getCookie(name) {{
+        const v = document.cookie.split('; ').find(r => r.startsWith(name + '='));
+        return v ? decodeURIComponent(v.split('=')[1]) : null;
+    }}
+    function setCookie(name, value, days) {{
+        const d = new Date();
+        d.setTime(d.getTime() + days*24*60*60*1000);
+        document.cookie = name + '=' + encodeURIComponent(value) + ';expires=' + d.toUTCString() + ';path=/';
+    }}
+    const raw = getCookie('nokah_freemium');
+    const data = raw ? JSON.parse(raw) : {{count: 0, plan: 'free', extra: 0}};
+    data.plan = '{plan}';
+    data.extra = {extra};
+    setCookie('nokah_freemium', JSON.stringify(data), 365);
+}})();
+</script>
+"""
+
+# ── Session init ───────────────────────────────────────────────────────────────
 def init_session():
+    """Initialise la session depuis le cookie navigateur."""
+    if "nk_initialized" not in st.session_state:
+        st.session_state.nk_initialized   = False
     if "analyses_count" not in st.session_state:
-        st.session_state.analyses_count = 0
+        st.session_state.analyses_count    = 0
     if "plan" not in st.session_state:
-        st.session_state.plan = "free"
+        st.session_state.plan              = "free"
     if "extra_analyses" not in st.session_state:
-        st.session_state.extra_analyses = 0
+        st.session_state.extra_analyses    = 0
     if "access_code_applied" not in st.session_state:
         st.session_state.access_code_applied = False
+    if "pending_increment" not in st.session_state:
+        st.session_state.pending_increment = False
 
+    # Injecter le lecteur de cookie — Streamlit va le rendre à chaque run
+    # On lit le cookie via query_params comme bridge (méthode fiable)
+    st.markdown(_COOKIE_READER, unsafe_allow_html=True)
+
+    # Bridge via query params : si ?nk_count=X est dans l'URL, on l'utilise
+    params = st.query_params
+    if "nk_count" in params:
+        try:
+            st.session_state.analyses_count = int(params["nk_count"])
+        except Exception:
+            pass
+    if "nk_plan" in params:
+        st.session_state.plan = params["nk_plan"]
+    if "nk_extra" in params:
+        try:
+            st.session_state.extra_analyses = int(params["nk_extra"])
+        except Exception:
+            pass
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
 def get_remaining():
-    total_allowed = FREE_ANALYSES + st.session_state.extra_analyses
+    total = FREE_ANALYSES + st.session_state.extra_analyses
     if st.session_state.plan == "pro":
         return 999999
-    return max(0, total_allowed - st.session_state.analyses_count)
+    return max(0, total - st.session_state.analyses_count)
 
 def can_analyze():
     return get_remaining() > 0 or st.session_state.plan == "pro"
 
 def increment_counter():
+    """Incrémente le compteur en session ET dans le cookie."""
     st.session_state.analyses_count += 1
+    # Persister dans le cookie via JS
+    st.markdown(_COOKIE_INCREMENT, unsafe_allow_html=True)
+    # Mettre à jour les query params pour la prochaine session
+    st.query_params["nk_count"] = str(st.session_state.analyses_count)
+    st.query_params["nk_plan"]  = st.session_state.plan
+    st.query_params["nk_extra"] = str(st.session_state.extra_analyses)
 
 def apply_access_code(code: str) -> bool:
     code = code.strip().upper()
     if code in ACCESS_CODES:
         info = ACCESS_CODES[code]
-        st.session_state.plan = info["plan"]
+        st.session_state.plan           = info["plan"]
         st.session_state.extra_analyses = info["extra_analyses"]
         st.session_state.access_code_applied = True
+        # Persister dans cookie + query params
+        st.markdown(_make_apply_code_js(info["plan"], info["extra_analyses"]), unsafe_allow_html=True)
+        st.query_params["nk_plan"]  = info["plan"]
+        st.query_params["nk_extra"] = str(info["extra_analyses"])
         return True
     return False
 
@@ -78,21 +195,14 @@ def render_analysis_counter():
 def render_paywall():
     """Affiche la page de blocage avec auto-scroll."""
 
-    # ── Auto-scroll vers le paywall ──────────────────────────────────────────
+    # Auto-scroll
     st.markdown("""
     <div id="nokah-paywall-anchor"></div>
     <script>
-        window.addEventListener('load', function() {
-            setTimeout(function() {
-                var el = document.getElementById('nokah-paywall-anchor');
-                if (el) { el.scrollIntoView({behavior: 'smooth', block: 'start'}); }
-            }, 300);
-        });
-        // Fallback immédiat
         setTimeout(function() {
             var el = document.getElementById('nokah-paywall-anchor');
             if (el) { el.scrollIntoView({behavior: 'smooth', block: 'start'}); }
-        }, 500);
+        }, 400);
     </script>
     """, unsafe_allow_html=True)
 
